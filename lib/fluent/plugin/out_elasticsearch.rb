@@ -21,6 +21,7 @@ class Fluent::ElasticsearchOutput < Fluent::BufferedOutput
   config_param :logstash_dateformat, :string, :default => "%Y.%m.%d"
   config_param :utc_index, :bool, :default => true
   config_param :type_name, :string, :default => "fluentd"
+  config_param :type_name_key, :string, :default => nil
   config_param :index_name, :string, :default => "fluentd"
   config_param :id_key, :string, :default => nil
   config_param :parent_key, :string, :default => nil
@@ -152,7 +153,9 @@ class Fluent::ElasticsearchOutput < Fluent::BufferedOutput
         record.merge!(@tag_key => tag)
       end
 
-      meta = { "index" => {"_index" => target_index, "_type" => type_name} }
+      record_type_name = type_name_key ? (key_value(record, @type_name_key_path ||= type_name_key.split('.')) || type_name) : type_name
+
+      meta = { "index" => {"_index" => target_index, "_type" => record_type_name} }
       if @id_key && record[@id_key]
         meta['index']['_id'] = record[@id_key]
       end
@@ -167,6 +170,10 @@ class Fluent::ElasticsearchOutput < Fluent::BufferedOutput
 
     send(bulk_message) unless bulk_message.empty?
     bulk_message.clear
+  end
+  
+  def key_value(record, path)
+    path.reduce(record) {|a,e| a && (a[e.to_s] || a[e.to_sym]) }
   end
 
   def send(data)
